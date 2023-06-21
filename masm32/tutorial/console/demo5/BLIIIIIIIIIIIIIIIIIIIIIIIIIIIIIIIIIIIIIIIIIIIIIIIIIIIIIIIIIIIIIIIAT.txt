@@ -1,0 +1,471 @@
+; ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤
+.586
+.model flat, stdcall
+
+option casemap:none
+
+   include masm32rt.inc
+
+	include windows.inc
+	include kernel32.inc
+	include user32.inc
+	include	msvcrt.inc
+
+	includelib kernel32.lib
+	includelib user32.lib
+	includelib msvcrt.lib
+
+.stack 4096
+							 
+FindIndxMax   PROTO pArr:ptr dword, uSize:dword
+FindIndxMin   PROTO pArr:ptr dword, uSize:dword
+
+ContainsZeros PROTO pArr:ptr dword, uSize:dword, uCount:dword
+FirstZero	  PROTO pArr:ptr dword, uSize:dword
+LastZero	  PROTO pArr:ptr dword, uSize:dword
+
+Replace		  PROTO pArr:ptr dword, uIndx:dword, sNum:dword
+
+InputArray	  PROTO hInput:dword, pArr:ptr dword, uSize:dword
+OutputArray	  PROTO pArr:ptr dword, uSize:dword
+
+ 
+.const
+	BUFFER_SIZE		 = 256
+	
+.data 
+
+
+
+	arr dd	-2, 0, 3, 0, 4, -13, 3, 0, -4
+		   ;-2, r, 3, 0, 4, -13, 3, r, -4
+	n	equ	($-arr)/4
+
+	consoleTitle db "Mykola Shevchenko KN-21 - 21st variant", 0
+	
+
+	promptSize	 db "Enter size of array:", 0Ah
+	promptExit	 db "Press Any Key To Exit...",0Ah
+
+
+
+	buffer			 db BUFFER_SIZE dup(?)
+
+
+.data?
+	hHeap			 dd ?
+	arraySize		 dd ?
+	arrayPtr		 dd ?
+
+	maxIndx			 dd ?
+	minIndx			 dd ?
+	firstIndxZero	 dd ?
+	lastIndxZero	 dd ?
+
+	distinct		 dd ?
+
+	hConsoleInput	 dd ?
+	hConsoleOutput   dd ?
+
+	bytesWritten	 dd ?
+
+	bytesRead		 dd ?
+
+
+
+.code
+
+
+; ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤
+
+main proc
+	; Create console
+	call AllocConsole
+
+
+	;-------------------------------------------------------;
+	; Get handles
+	invoke GetStdHandle, STD_INPUT_HANDLE
+	mov [hConsoleInput], eax
+
+	
+	invoke GetStdHandle, STD_OUTPUT_HANDLE
+	mov [hConsoleOutput], eax
+
+	;-------------------------------------------------------;
+	
+	invoke SetConsoleTitle, addr consoleTitle
+	
+	
+
+
+	;#region Enter size
+	invoke WriteConsole, hConsoleOutput, 
+			addr promptSize, sizeof promptSize, addr bytesWritten, 0
+
+	invoke ReadConsole, hConsoleInput,
+			addr buffer, sizeof buffer, addr bytesRead, 0  
+
+	invoke crt_atoi, addr buffer
+	mov arraySize, eax
+	;#endregion
+	
+	;#region Initialize heap
+
+	invoke HeapCreate, HEAP_GENERATE_EXCEPTIONS, 100000h, 0
+	mov hHeap, eax
+
+	;#endregion
+
+	;#region Allocate memory for array
+	mov ecx, arraySize
+	mov eax, sizeof dword
+	mul ecx
+	invoke HeapAlloc, hHeap, HEAP_GENERATE_EXCEPTIONS, eax
+	mov arrayPtr, eax
+	;#endregion
+
+	;#region Fill array
+	invoke InputArray, hConsoleInput,  arrayPtr, arraySize
+
+	;#endregion
+	print chr$(13,10,13,10)  
+	print chr$("Array before:",13,10)
+	;#region
+		invoke OutputArray, arrayPtr, arraySize
+	;#endregion
+
+
+	invoke ContainsZeros, arrayPtr, arraySize, 2 ; return 0 or 1
+	.if eax == 1
+
+		;----------------------------------------;
+		;--Find min and max----------------------;
+		invoke FindIndxMax,  arrayPtr, arraySize ; return index in eax
+		mov maxIndx, eax
+
+		invoke FindIndxMin,  arrayPtr, arraySize ; return index in eax
+		mov minIndx, eax
+
+		invoke FirstZero,  arrayPtr, arraySize	; return index in eax
+		mov firstIndxZero, eax
+
+		invoke LastZero,  arrayPtr, arraySize	; return index in eax
+		mov lastIndxZero, eax
+
+		;----------------------------------------;
+		;--Find distinct-------------------------;
+		
+		lea esi, arr
+		mov edx, maxIndx
+		;mov eax, [esi+edx*4]
+		mov eax, [esi+edx*sizeof dword]
+		mov edx, minIndx
+		;mov ebx, [esi+edx*4]
+		mov ebx, [esi+edx*sizeof dword]
+		sub eax, ebx
+		mov distinct, eax
+		;-----------------------------------------;
+		;--Replace 1st zero and last--------------;
+
+		invoke Replace,  arrayPtr, firstIndxZero, distinct
+
+		invoke Replace,  arrayPtr, lastIndxZero, distinct
+		;----------------------------------------;
+
+		
+
+	.else
+
+	.endif
+
+	;#region
+		print chr$(13,10)  
+		print chr$("Array after:",13,10)
+		invoke OutputArray, arrayPtr, arraySize
+	;#endregion		
+
+	invoke WriteConsole, hConsoleOutput, 
+			addr promptExit, sizeof promptExit, addr bytesWritten, 0
+
+	call crt__getch
+
+
+	invoke HeapFree, hHeap, 0, arrayPtr
+	invoke HeapDestroy, hHeap
+
+	call FreeConsole
+
+	push 0
+	call ExitProcess
+main endp
+
+; ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤s
+
+Replace proc	uses esi ebx eax,
+				pArr:ptr dword, 
+				uIndx:dword, 
+				sNum:dword
+	
+	mov ebx, uIndx
+	mov eax, sNum 
+	mov esi, pArr
+	;mov esi, DWORD PTR[esi]
+
+
+	mov [esi+ebx*sizeof dword], eax ; Store the new value at the specified index
+
+	ret
+Replace endp
+
+
+; ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤s
+
+FirstZero proc	uses esi ecx ebx edx,
+				pArr:ptr dword,
+				uSize:dword
+
+	mov esi, pArr
+	;mov esi, DWORD PTR[esi]
+	mov ecx, uSize
+	mov edx, 0
+		L1:
+			mov ebx, [esi]
+			.if ebx == 0
+				jmp collision ; We have 1st collision and we will write it
+			.endif
+			add esi, sizeof dword
+			dec ecx
+			inc edx
+			jnz L1
+
+	mov eax, -1 ; We don't have any zeros, return -1 in eax
+	jmp @f
+
+	collision:
+	mov eax, edx  ; Move the position of the max element to eax
+	
+
+	@@:
+
+
+	ret
+
+FirstZero endp
+
+; ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤
+
+LastZero proc uses esi ecx ebx edx,
+				pArr:ptr dword, 
+				uSize:dword
+
+	mov esi, pArr
+	;mov esi, DWORD PTR[esi]
+	mov ecx, uSize
+
+	mov edx, ecx	; ecx - size of array
+	shl edx, 2		; size of array in bytes
+	sub edx, 4		; last element
+
+	add esi, edx	; 
+
+
+		L1:
+			mov ebx, [esi]
+			.if ebx == 0
+				jmp collision ; We have 1st collision and we will write it
+			.endif
+
+			sub esi, sizeof dword
+			dec ecx
+			jnz L1
+
+	mov eax, -1 ; otherwise We don't have any zeros, return -1 in eax
+	jmp @f
+
+	collision:
+	mov eax, ecx  ; Move the position of the max element to eax
+	sub eax, 1	; because we start from 0
+
+	@@:
+
+	ret
+
+LastZero endp
+
+; ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤
+
+ContainsZeros proc uses ebx ecx edx esi,
+					pArr:ptr dword, 
+					uSize:dword, 
+					uCount:dword
+
+	mov esi, pArr
+	;mov esi, DWORD PTR[esi]
+	mov ecx, uSize
+	mov eax, uCount
+	mov edx, 0
+
+	
+		L1:
+			
+			mov ebx, DWORD PTR[esi]
+			.if ebx == 0
+				inc edx
+			.endif
+
+			.if edx == eax ; We don't need check more 
+				mov eax, 1 ; True - we have count 0's
+				jmp @f ; Restore registars and return
+			.endif
+
+			add esi, sizeof dword
+			dec ecx
+			jnz L1
+
+	mov eax, 0 ; If we don't have any 0's
+	@@:
+
+	ret
+
+ContainsZeros endp
+
+; ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤
+
+FindIndxMax proc uses esi ebx ecx,
+					pArr:ptr dword, 
+					uSize:dword
+	LOCAL indx	:dword   ; Local variable to store the position of the max element
+	LOCAL max   :dword   ; Local variable to store the max element
+
+	mov ebx, pArr
+	;mov ebx, DWORD PTR[ebx]
+	mov ecx, uSize
+
+
+	mov indx, -1         ; Set the initial position of the max element to -1
+	xor esi, esi            ; Clear esi register
+	mov eax, DWORD PTR [ebx+esi]    ; Move the first element of the array to eax (start of loop)
+	mov max, eax            ; Set the initial max element to the first element
+
+	loop_start:
+		mov eax, DWORD PTR [ebx+esi] ; Move the next element of the array to eax
+		cmp eax, max         ; Compare the value of eax to the current max element
+		jg  update_max       ; If eax is greater than max, update the max element
+		jmp next_iteration   ; Otherwise, continue to the next iteration
+
+	update_max:
+		mov max, eax         ; Update the max element to the value of eax
+		mov indx, esi     ; Update the position of the max element to the current position
+
+	next_iteration:
+		add esi, sizeof dword            ; Increment the position of the element (each element is 4 bytes)
+		;cmp esi, ecx          ; Compare the current position to the size of the array
+		;jl  loop_start        ; If the end of the array has not been reached, continue the loop
+		dec ecx
+		jnz loop_start
+	
+	mov eax, indx  ; Move the position of the max element to eax
+	shr	eax, 2		; Because we have in eax size in bytes we need to divide it 4b
+
+
+	ret                     
+
+FindIndxMax endp
+
+; ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤
+
+FindIndxMin proc uses esi ebx ecx,
+					pArr:ptr dword, 
+					uSize:dword
+	LOCAL indx	:dword  ; Local variable to store the position of the minimum value
+	LOCAL min	:dword  ; Local variable to store the minimum value
+
+	mov ebx, pArr
+	;mov ebx, DWORD PTR[ebx]
+	mov ecx, uSize
+
+	mov indx, -1         ; Initialize pos_min to -1
+	xor esi, esi            ; Initialize the index variable to 0
+	mov eax, DWORD PTR [ebx+esi]    ; Load the first element of the array into eax
+	mov min, eax            ; Initialize min to the first element
+
+	loop_start:
+		mov eax, DWORD PTR [ebx+esi]    ; Load the next element of the array into eax
+		cmp eax, min            ; Compare the element with min
+		jl  update_min          ; If the element is less than min, update min and pos_min
+		jmp next_iteration      ; Otherwise, move on to the next iteration
+
+	update_min:
+		mov min, eax            ; Update min to the new minimum value
+		mov indx, esi        ; Update pos_min to the index of the new minimum value
+
+	next_iteration:
+		add esi, sizeof dword              ; Increment the index variable by 4 bytes (size of a dword)
+		;cmp esi, ecx            ; Compare the index with the length of the array
+		;jl  loop_start          ; If the index is less than the length, continue iterating
+		dec ecx
+		jnz loop_start
+
+	mov eax, indx  ; Move the position of the max element to eax
+	shr	eax, 2		; Because we have in eax size in bytes we need to divide it 4b
+
+	ret
+FindIndxMin endp
+
+; ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤
+
+InputArray proc uses eax ecx esi, 
+					hInput:dword, 
+					pArr:ptr dword, 
+					uSize:dword
+						
+	LOCAL _bytesRead  :dword
+	LOCAL _bufer_[BUFFER_SIZE]	  :byte
+	
+	mov esi, pArr
+	;mov esi, DWORD PTR[esi]
+	mov ecx, uSize
+	L1:
+		push ecx		
+		invoke FlushConsoleInputBuffer, hInput	
+		
+		invoke ReadConsole, hInput, 
+				addr _bufer_, sizeof _bufer_, addr _bytesRead, 0 
+		
+		invoke crt_atoi, 
+					addr _bufer_			
+		mov [esi], eax
+		add esi, sizeof dword
+		pop ecx
+		dec ecx
+		jnz L1
+
+    ret
+	
+InputArray endp
+
+
+; ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤
+
+OutputArray proc uses   ecx  esi, 
+					pArr:ptr dword, 
+					uSize:dword
+
+	mov esi, pArr
+	;mov esi, DWORD PTR[esi]
+	mov ecx, 0
+	.while ecx != uSize
+		push ecx
+		print str$([esi+ecx*sizeof dword])
+		print chr$(" ")
+		pop ecx
+		inc ecx
+	.endw
+    print chr$(13,10,13,10)   
+	ret
+		
+OutputArray endp
+
+
+end main

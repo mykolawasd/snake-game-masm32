@@ -1,0 +1,65 @@
+	;mov esi, pArr
+	;mov ecx, uSize
+;	L1:
+	;	mov ecx, uSize
+	;	cmp ecx, 0
+;		je @f
+;		dec ecx
+	;	mov uSize, ecx
+		
+		;push [esi]
+		;push _bufer_
+		;push 10
+		;call crt__itoa
+		
+		;invoke crt__itoa, addr [esi], addr  _bufer_, 10
+		;add esp, 12 ;
+		;mov dl, [esi]
+		;invoke WriteConsole, hOutput,  dl, 1, addr bytesWritten_, 0
+		;mov dl, 32 ; space character
+		;invoke WriteConsole, hOutput,  dl, 1, addr bytesWritten_, 0
+
+		; Convert to string
+		;invoke wsprintf, addr _bufer_, "%x", [esi]
+		;invoke WriteConsole, hOutput, addr _bufer_, sizeof _bufer_, bytesWritten_, 0
+
+		;invoke crt_printf, addr fmt, [esi]
+		;invoke print chr$("Hi, I am in the 'main' procedure",13,10)
+
+		;printf ("my int %d\n", [esi]);
+
+		;invoke crt_printf, addr fmt, [esi]
+	;	 mov temp, [esi]
+	;	 invoke StdOut,  addr temp
+		
+		
+	
+			
+	;add esi, sizeof dword
+	;dec ecx
+	;jmp L1
+       
+
+
+	;mov esi, pArr
+	;xor edx, edx
+	;mov ecx, uSize
+	;L1:
+	;	mov ecx, uSize
+	;	cmp ecx, 0
+	;	je @f
+	;	dec ecx
+	;	mov uSize, ecx
+	;	mov eax, dword ptr [esi]
+	;	print str$(eax)
+	;	print chr$(" ")
+;
+		
+			
+	;add edx, sizeof dword
+	;;dec ecx
+;	jmp L1
+
+
+
+
